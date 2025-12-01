@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Alignment Drift Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #050814;
+      --card-bg: #0e1324;
+      --accent-good: #ffd86b;
+      --accent-evil: #ff4b5c;
+      --accent-neutral: #9ca3af;
+      --text-main: #f9fafb;
+      --text-sub: #9ca3af;
+      --border-subtle: #1f2933;
+      --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.45);
+      --radius-lg: 18px;
+      --radius-pill: 999px;
+      --transition-fast: 0.18s ease-out;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 60%);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 16px;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 900px;
+      background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 55%),
+                  radial-gradient(circle at bottom right, rgba(250, 204, 21, 0.08), transparent 50%),
+                  var(--card-bg);
+      border-radius: 24px;
+      padding: 24px 26px 22px;
+      box-shadow: var(--shadow-soft);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+      gap: 22px;
+    }
+
+    @media (max-width: 720px) {
+      .app-shell {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 18px;
+      }
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .title-block h1 {
+      font-size: 1.3rem;
+      letter-spacing: 0.03em;
+    }
+
+    .title-block p {
+      margin-top: 4px;
+      font-size: 0.85rem;
+      color: var(--text-sub);
+    }
+
+    .tag {
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-sub);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(15, 23, 42, 0.8);
+      white-space: nowrap;
+    }
+
+    .tag-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-good), #f97316);
+      box-shadow: 0 0 8px rgba(250, 204, 21, 0.9);
+    }
+
+    .main-panel {
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: var(--radius-lg);
+      padding: 16px 16px 14px;
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      backdrop-filter: blur(10px);
+    }
+
+    .track-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+      padding: 0 2px;
+    }
+
+    .track-labels span {
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .track-labels span:first-child {
+      color: var(--accent-evil);
+    }
+
+    .track-labels span:nth-child(2) {
+      color: var(--accent-neutral);
+    }
+
+    .track-labels span:last-child {
+      color: var(--accent-good);
+    }
+
+    .track {
+      position: relative;
+      height: 14px;
+      border-radius: var(--radius-pill);
+      background: linear-gradient(90deg,
+        rgba(248, 113, 113, 0.15) 0%,
+        rgba(248, 113, 113, 0.45) 10%,
+        rgba(148, 163, 184, 0.5) 50%,
+        rgba(253, 224, 71, 0.6) 90%,
+        rgba(253, 224, 71, 0.2) 100%
+      );
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .track-center-line {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      width: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(148, 163, 184, 0.7);
+      opacity: 0.9;
+    }
+
+    .marker {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #ffffff, #fbbf24);
+      box-shadow:
+        0 0 10px rgba(250, 204, 21, 0.9),
+        0 0 18px rgba(250, 204, 21, 0.7);
+      border: 2px solid rgba(15, 23, 42, 0.8);
+      transition: left var(--transition-fast);
+    }
+
+    .marker-ghost {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 50%, rgba(250, 204, 21, 0.2), transparent 55%);
+      opacity: 0.25;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 0 1px;
+    }
+
+    .summary-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .summary-main span.label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-sub);
+    }
+
+    .summary-main span.value {
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .summary-sub {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      text-align: right;
+    }
+
+    .buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    button {
+      border-radius: var(--radius-pill);
+      border: 1px solid transparent;
+      padding: 7px 14px;
+      font-size: 0.83rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: none;
+      color: var(--text-main);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.15s ease-out, transform 0.1s ease-out, box-shadow 0.15s ease-out, border-color 0.15s ease-out;
+      white-space: nowrap;
+    }
+
+    button span.badge {
+      font-size: 0.72rem;
+      opacity: 0.9;
+    }
+
+    button.primary-good {
+      background: radial-gradient(circle at top left, #facc15, #f97316);
+      color: #0b1120;
+      border-color: rgba(251, 191, 36, 0.9);
+      box-shadow: 0 0 16px rgba(250, 204, 21, 0.6);
+    }
+
+    button.primary-evil {
+      background: radial-gradient(circle at top left, #fb7185, #b91c1c);
+      color: #f9fafb;
+      border-color: rgba(248, 113, 113, 0.9);
+      box-shadow: 0 0 16px rgba(248, 113, 113, 0.6);
+    }
+
+    button.secondary {
+      border-color: rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-sub);
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      font-size: 0.85rem;
+    }
+
+    .side-card {
+      background: rgba(15, 23, 42, 0.85);
+      border-radius: var(--radius-lg);
+      padding: 12px 14px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+
+    .side-card h2 {
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-sub);
+    }
+
+    .side-card p {
+      color: var(--text-sub);
+      line-height: 1.4;
+      margin-bottom: 6px;
+    }
+
+    .mini-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border-radius: var(--radius-pill);
+      font-size: 0.7rem;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: var(--text-sub);
+    }
+
+    .pill.good {
+      border-color: rgba(251, 191, 36, 0.8);
+      color: var(--accent-good);
+    }
+
+    .pill.evil {
+      border-color: rgba(248, 113, 113, 0.8);
+      color: var(--accent-evil);
+    }
+
+    .pill.neutral {
+      border-color: rgba(148, 163, 184, 0.8);
+      color: var(--accent-neutral);
+    }
+
+    .log {
+      max-height: 180px;
+      overflow-y: auto;
+      padding-right: 4px;
+      margin-top: 4px;
+    }
+
+    .log-entry {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(30, 64, 175, 0.35);
+      font-size: 0.78rem;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-type {
+      font-weight: 500;
+    }
+
+    .log-type.good {
+      color: var(--accent-good);
+    }
+
+    .log-type.evil {
+      color: var(--accent-evil);
+    }
+
+    .log-meta {
+      color: var(--text-sub);
+      text-align: right;
+    }
+
+    .log-empty {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      opacity: 0.8;
+      padding-top: 4px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .stat-chip {
+      flex: 1;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      padding: 6px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--text-sub);
+    }
+
+    .stat-chip span.value {
+      font-weight: 500;
+      color: var(--text-main);
+    }
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .tiny-button {
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: 0.15s ease-out;
+    }
+
+    .tiny-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .tiny-button:active {
+      transform: translateY(0);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div>
+      <div class="header">
+        <div class="title-block">
+          <h1>Alignment Drift Tracker</h1>
+          <p>Track how far your druid has shifted between Good and Evil through elemental wild shapes.</p>
+        </div>
+        <div class="tag">
+          <span class="tag-dot"></span>
+          <span>Single Axis: Good ↔ Evil</span>
+        </div>
+      </div>
+
+      <div class="main-panel">
+        <div class="track-labels">
+          <span>Evil</span>
+          <span>Neutral</span>
+          <span>Good</span>
+        </div>
+        <div class="track" aria-hidden="true">
+          <div class="track-center-line"></div>
+          <div class="marker-ghost"></div>
+          <div class="marker" id="marker"></div>
+        </div>
+
+        <div class="summary-row">
+          <div class="summary-main">
+            <span class="label">Current alignment position</span>
+            <span class="value" id="alignmentValueText">0.00 (Neutral)</span>
+          </div>
+          <div class="summary-sub" id="alignmentSummary">
+            0% toward Good, 0% toward Evil
+          </div>
+        </div>
+
+        <div class="buttons-row">
+          <button class="primary-good" id="lightButton">
+            ☀ Wild Shape: Light Elemental
+            <span class="badge">+0.2 toward Good (max +1.0)</span>
+          </button>
+          <button class="primary-evil" id="darkButton">
+            🌑 Wild Shape: Dark Elemental
+            <span class="badge">-0.2 toward Evil (min -1.0)</span>
+          </button>
+          <button class="secondary" id="resetButton">
+            ⟳ Reset to True Neutral
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="side-card">
+        <h2>How it works</h2>
+        <p>
+          The bar is a single line from full Evil at the far left (-1.0) to full Good at the far right (+1.0),
+          with True Neutral at the center (0.0).
+        </p>
+        <p>
+          Every time you wild shape, you move one fifth of the remaining distance toward the relevant extreme,
+          so you drift gradually rather than in hard jumps.
+        </p>
+        <div class="mini-row">
+          <span class="pill evil">-1.0 Evil</span>
+          <span class="pill neutral">0.0 Neutral</span>
+          <span class="pill good">+1.0 Good</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-chip">
+            <span>Light shapes</span>
+            <span class="value" id="lightCount">0</span>
+          </div>
+          <div class="stat-chip">
+            <span>Dark shapes</span>
+            <span class="value" id="darkCount">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-card">
+        <div class="log-header">
+          <h2>Session log</h2>
+          <button class="secondary tiny-button" id="clearLogButton">🗑 Clear Log</button>
+        </div>
+        <div id="log" class="log">
+          <div class="log-empty">No wild shapes recorded yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const marker = document.getElementById("marker");
+    const alignmentValueText = document.getElementById("alignmentValueText");
+    const alignmentSummary = document.getElementById("alignmentSummary");
+    const lightCountEl = document.getElementById("lightCount");
+    const darkCountEl = document.getElementById("darkCount");
+    const logContainer = document.getElementById("log");
+
+    const lightButton = document.getElementById("lightButton");
+    const darkButton = document.getElementById("darkButton");
+    const resetButton = document.getElementById("resetButton");
+
+    const STORAGE_KEY = "alignmentDriftState_v1";
+
+
+    let state = {
+      alignment: 0.0, // -1 (Evil) to +1 (Good)
+      lightCount: 0,
+      darkCount: 0,
+      log: [] // {type: 'light'|'dark'|'reset', from, to, timestamp}
+    };
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.alignment === "number") state.alignment = parsed.alignment;
+        if (typeof parsed.lightCount === "number") state.lightCount = parsed.lightCount;
+        if (typeof parsed.darkCount === "number") state.darkCount = parsed.darkCount;
+        if (Array.isArray(parsed.log)) state.log = parsed.log;
+      } catch (e) {
+        console.warn("Failed to load alignment state, using defaults.", e);
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.warn("Failed to save alignment state.", e);
+      }
+    }
+
+    function clampAlignment(value) {
+      return Math.max(-1, Math.min(1, value));
+    }
+
+    function describeAlignment(value) {
+      const rounded = value.toFixed(2);
+      if (value > 0.25) return `${rounded} (Good-leaning)`;
+      if (value < -0.25) return `${rounded} (Evil-leaning)`;
+      if (Math.abs(value) < 0.05) return `${rounded} (True Neutral)`;
+      if (value > 0) return `${rounded} (Slightly Good)`;
+      return `${rounded} (Slightly Evil)`;
+    }
+
+    function updateMarkerPosition() {
+      // value -1 -> 0%, 0 -> 50%, 1 -> 100%
+      const v = clampAlignment(state.alignment);
+      const percentage = ((v + 1) / 2) * 100;
+      marker.style.left = `${percentage}%`
+    }
+
+    function updateSummaryTexts() {
+      alignmentValueText.textContent = describeAlignment(state.alignment);
+
+      const towardGood = Math.max(0, state.alignment);
+      const towardEvil = Math.max(0, -state.alignment);
+
+      const goodPercent = Math.round(towardGood * 100);
+      const evilPercent = Math.round(towardEvil * 100);
+
+      alignmentSummary.textContent =
+        `${goodPercent}% toward Good, ${evilPercent}% toward Evil`;
+    }
+
+    function updateCounters() {
+      lightCountEl.textContent = state.lightCount;
+      darkCountEl.textContent = state.darkCount;
+    }
+
+    function renderLog() {
+      if (!state.log.length) {
+        logContainer.innerHTML = '<div class="log-empty">No wild shapes recorded yet.</div>';
+        return;
+      }
+
+      logContainer.innerHTML = "";
+      state.log.slice().reverse().forEach(entry => {
+        const row = document.createElement("div");
+        row.className = "log-entry";
+
+        const typeSpan = document.createElement("span");
+        typeSpan.classList.add("log-type");
+
+        if (entry.type === "light") {
+          typeSpan.classList.add("good");
+          typeSpan.textContent = "Light Elemental";
+        } else if (entry.type === "dark") {
+          typeSpan.classList.add("evil");
+          typeSpan.textContent = "Dark Elemental";
+        } else {
+          typeSpan.textContent = "Reset to Neutral";
+        }
+
+        const metaSpan = document.createElement("span");
+        metaSpan.className = "log-meta";
+
+        const fromStr = entry.from.toFixed(2);
+        const toStr = entry.to.toFixed(2);
+
+        const time = new Date(entry.timestamp || Date.now());
+        const timeStr =
+          time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
+          " " +
+          time.toLocaleDateString();
+
+        metaSpan.textContent = `${fromStr} → ${toStr} • ${timeStr}`;
+
+        row.appendChild(typeSpan);
+        row.appendChild(metaSpan);
+        logContainer.appendChild(row);
+      });
+    }
+
+    function refreshUI() {
+      state.alignment = clampAlignment(state.alignment);
+      updateMarkerPosition();
+      updateSummaryTexts();
+      updateCounters();
+      renderLog();
+      saveState();
+    }
+
+function applyLightShape() {
+  const from = state.alignment;
+  const step = 0.2; // discrete step toward Good
+  state.alignment = clampAlignment(from + step);
+  state.lightCount += 1;
+  state.log.push({
+    type: "light",
+    from,
+    to: state.alignment,
+    timestamp: Date.now()
+  });
+  refreshUI();
+}
+
+function applyDarkShape() {
+  const from = state.alignment;
+  const step = 0.2; // discrete step toward Evil
+  state.alignment = clampAlignment(from - step);
+  state.darkCount += 1;
+  state.log.push({
+    type: "dark",
+    from,
+    to: state.alignment,
+    timestamp: Date.now()
+  });
+  refreshUI();
+}
+
+function clearLog() {
+  state.log = [];
+  saveState();
+  renderLog();
+}
+
+    function resetAlignment() {
+      const from = state.alignment;
+      state.alignment = 0;
+      state.log.push({
+        type: "reset",
+        from,
+        to: 0,
+        timestamp: Date.now()
+      });
+      refreshUI();
+    }
+
+    lightButton.addEventListener("click", applyLightShape);
+    darkButton.addEventListener("click", applyDarkShape);
+    resetButton.addEventListener("click", resetAlignment);
+    document.getElementById("clearLogButton").addEventListener("click", clearLog);
+
+    loadState();
+    refreshUI();
+  </script>
+</body>
+</html>
